@@ -4,12 +4,11 @@
 import numpy as np
 import pylab as pl
 from sklearn import datasets
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.metrics import mean_squared_error
 from sklearn.cross_validation import ShuffleSplit, train_test_split
-from sklearn.metrics import make_scorer
 from sklearn.grid_search import GridSearchCV
-from sklearn.cross_validation import KFold
+from sklearn.metrics import make_scorer
+from sklearn.metrics import mean_squared_error
+from sklearn.tree import DecisionTreeRegressor
 
 
 ################################
@@ -38,9 +37,9 @@ def explore_city_data(city_data):
     # Please calculate the following values using the Numpy library
 
     # Size of data (number of houses)?
-    n_rows = np.size(city_data.data, axis=0)
+    n_rows = np.shape(city_data.data)[0]
     # Number of features?
-    n_features = np.size(city_data.data, axis=1)
+    n_features = np.shape(city_data.data)[0]
     # Minimum price?
     price_min = np.min(city_data.target)
     # Maximum price?
