@@ -3,8 +3,11 @@
 # Load libraries
 import numpy as np
 import pylab as pl
+import pandas as pd
+import matplotlib.pyplot as plt
+
 from sklearn import datasets
-from sklearn.cross_validation import ShuffleSplit, train_test_split
+from sklearn.cross_validation import ShuffleSplit, train_test_split, KFold
 from sklearn.grid_search import GridSearchCV
 from sklearn.metrics import make_scorer
 from sklearn.metrics import mean_squared_error
@@ -76,16 +79,64 @@ def split_data(city_data):
     return X_train, y_train, X_test, y_test
 
 
-def learning_curve(depth, X_train, y_train, X_test, y_test):
+def learning_curve(depths, X_train, y_train, X_test, y_test):
     """Calculate the performance of the model after a set of training data."""
 
+    # print "Decision Tree with Max Depth: "
+    # print depth
+
     # We will vary the training set size so that we have 50 different sizes
-    sizes = np.linspace(1, len(X_train), 50)
+    # Make as an argument to only create once and use for all call in the loop.
+    num_of_sizes = 50
+    sizes = np.linspace(1, len(X_train), num_of_sizes)
+
+    total_size = num_of_sizes * len(depths)
+
+    # Initialize a empty Numpy arrays for all training/test errors
+    train_err_all = np.empty(0)
+    test_err_all = np.empty(0)
+
+    # Repeat each depth value 50 times (num_of_sizes)
+    depths_all = np.repeat(depths, num_of_sizes)
+
+    # Repeat the sizes sequence (np.linspace()..) so each step is labeled in each depth
+    size_all = np.resize(sizes, total_size)
+
+    fill_index = 0
+
+    for depth in depths:
+        test_err, train_err = train_decision_tree(sizes, depth, X_test, X_train, y_test, y_train)
+
+        train_err_all = np.append(train_err_all, train_err)
+        test_err_all = np.append(test_err_all, test_err)
+
+        fill_index += num_of_sizes
+
+    learning_curve_df = pd.DataFrame({'Depth': depths_all,
+                                      'Training Error': train_err_all,
+                                      'Test Error': test_err_all,
+                                      'Size': size_all})
+
+    learning_curve_graph_pd(learning_curve_df)
+
+
+def train_decision_tree(sizes, depth, X_test, X_train, y_test, y_train):
+    """
+    Args:
+        sizes   (Numpy array): Array of training sample sizes to train on.
+        depth   (int): The maximum depth of the DecisionTreeRegressor
+        X_test  (Numpy array): Test set features
+        X_train (Numpy array): Training set features
+        y_test  (Numpy array): Test set target variable
+        y_train (Numpy array): Training set target variable
+
+    Returns:
+        test_err  (Numpy array): Test set predictions.
+        train_err (Numpy array): Training set predictions.
+    """
+
     train_err = np.zeros(len(sizes))
     test_err = np.zeros(len(sizes))
-
-    print "Decision Tree with Max Depth: "
-    print depth
 
     for i, s in enumerate(sizes):
         # Create and fit the decision tree regressor model
@@ -96,11 +147,28 @@ def learning_curve(depth, X_train, y_train, X_test, y_test):
         train_err[i] = performance_metric(y_train[:s], regressor.predict(X_train[:s]))
         test_err[i] = performance_metric(y_test, regressor.predict(X_test))
 
-    # Plot learning curve graph
-    learning_curve_graph(sizes, train_err, test_err)
+    return test_err, train_err
 
+def learning_curve_graph_pd(df):
+    # TODO: Add docstrings
+    # key = each Depth value
+    # grp is each sub-dataframe filtered by the Depth value of 'key'
+    fig = plt.figure(figsize=(16, 18))
 
-def learning_curve_graph(sizes, train_err, test_err):
+    for i, key_group_pair in enumerate(df.groupby(['Depth'])):
+        key, grp = key_group_pair
+        each_ax = fig.add_subplot(5, 2, i+1)
+        each_ax.set_ylim([0, 80])
+        each_ax.set_title('Depth: {}'.format(i+1))
+        each_ax.plot(grp['Size'], grp['Test Error'])
+        each_ax.plot(grp['Size'], grp['Training Error'])
+
+    plt.suptitle('Train & Test set error as a function of training set size', fontsize=20)
+    plt.legend(loc='best')
+    plt.xlabel('Training set size', fontsize=20, horizontalalignment='right')
+    plt.show()
+
+def learning_curve_graph(sizes, train_err, test_err, show=True):
     """Plot training and test error as a function of the training size."""
 
     pl.figure()
@@ -153,7 +221,8 @@ def model_complexity_graph(max_depth, train_err, test_err):
     pl.show()
 
 
-def fit_predict_model(city_data):
+def fit_predict_model(city_data, verbose=True):
+    # TODO: Add docstrings
     """Find and tune the optimal model. Make a prediction on housing data."""
 
     # Get the features and labels from the Boston housing data
@@ -167,54 +236,144 @@ def fit_predict_model(city_data):
     ###################################
     ### Step 4. YOUR CODE GOES HERE ###
     ###################################
-
+    # TODO: Add train/test split to fit_predict() to fit on testing data only as part of best practices.
+    # TODO: Move KFold justification to report outside script.
     # 1. Find the best performance metric
     # should be the same as your performance_metric procedure
     # http://scikit-learn.org/stable/modules/generated/sklearn.metrics.make_scorer.html
 
-    mse_scorer = make_scorer(performance_metric, # Use our performance metric, which is just mean squared error(mse)
-                             greater_is_better=False)  # False because we are trying to minimize the loss, MSE
+    mse_scorer = make_scorer(performance_metric,  # Use our performance metric, which is just mean squared error(mse)
+                             greater_is_better=False)  # False because we are trying to minimize a loss function, MSE
 
     # 2. Use gridearch to fine tune the Decision Tree Regressor and find the best model
     # http://scikit-learn.org/stable/modules/generated/sklearn.grid_search.GridSearchCV.html#sklearn.grid_search.GridSearchCV
 
-    # We'll use 10 different shuffled versions of the data since our data set size is pretty small.
+
+    # We'll choose the more often used 10-fold cross validation instead of the default of 3.
+    # We'd like to avoid having our K-fold split being too low to avoid having higher variance between models trained.
+    #   If K is too low, the amount of data for training the model (66% in the case of 3-fold) would be lower (which
+    #   might be a problem with our smaller data set.
+    # We also don't want to k-fold splits to be too high, since as K approaches N (the number of data points in our data
+    #   set), we would have more and more overlap in training data used to train on. This would make all of the models
+    #   more and more correlated with each other as K approaches N. This might cause another type of higher variance in
+    #   our predicted models since "In general, if the variables are correlated, then the variance of their sum is
+    #   the sum of their covariances" 1, 2
+    # 1. https://en.wikipedia.org/wiki/Variance#Sum_of_correlated_variables
+    # 2. http://stats.stackexchange.com/questions/61783/variance-and-bias-in-cross-validation-why-does-leave-one-out-cv-have-higher-var
+
+
     # Ideally we would want to split once around 70/30 train/test.
-    # Then do Kfold cross-validation on the training set only, then test once only on the hold-out test set.
+    # Then do Kfold cross-validation on a 70% training set only, then test once only on the 30% hold-out test set.
 
     # Or even more ideally, further split the training set into a training/validation sets,
     # train on the training set while scoring on the hold-out validation set to adjust our model parameters.
-    # Then once done fine-tuning, run our model once on the hold-out test set.
-    # But this would require more data since so many splits would reduce the predictive power of our model,
-    #   causing it to have high variance.
-    shuffle_split = ShuffleSplit(np.shape(X)[0],
-                                 n_iter=10,
-                                 test_size=0.25,
+    # Then once done fine-tuning, run our model once on the 30% hold-out test set to get an idea of the out-of-sample
+    #   performance.
+    # But again, this would require more data since so many splits would reduce the predictive power of our model,
+    #   causing it to have higher variance.
+
+
+    # Note: In this particular function, we are simply training a final model using the full training set and
+    #   10-fold cross validation.
+
+    kfold_split = KFold(np.shape(X)[0],
+                                 n_folds=10,
                                  random_state=None)
 
     reg = GridSearchCV(estimator=regressor,
                        param_grid=parameters,
                        scoring=mse_scorer,
                        n_jobs=4,
-                       cv=shuffle_split)
+                       cv=kfold_split)
 
     # Fit the learner to the training data
-    print "Final Model: "
-    print reg.fit(X, y)
+    if verbose == True:
+        print "Final Model: "
+        print reg.fit(X, y)
 
-    print "*" * 80
-    print "Best Estimator: {0}".format(reg.best_estimator_)
-    print ""
-    print "Best Params: {0}".format(reg.best_params_)
-    print "Mean Square Error of Best Model {0}".format(reg.best_score_)
-    print "*" * 80
+        print "*" * 80
+        print "Best Estimator: {0}".format(reg.best_estimator_)
+        print ""
+        print "Best Params: {0}".format(reg.best_params_)
+        print "Mean Square Error of Best Model {0}".format(reg.best_score_)
+        print "*" * 80
 
-    # Use the model to predict the output of a particular sample
-    x = [11.95, 0.00, 18.100, 0, 0.6590, 5.6090, 90.00, 1.385, 24, 680.0, 20.20, 332.09, 12.13]
-    y = reg.predict(x)
-    print "House: " + str(x)
-    print "Prediction: " + str(y)
+        # Use the model to predict the output of a particular sample
+        # Changed to address changes in sklearn:
+        # DeprecationWarning: Passing 1d arrays as data is deprecated in 0.17 and willraise ValueError in 0.19.
+        x = np.array([11.95, 0.00, 18.100, 0, 0.6590, 5.6090, 90.00, 1.385, 24, 680.0, 20.20, 332.09, 12.13]).reshape(1, -1)
+        y = reg.predict(x)
+        print "House: " + str(x)
+        print "Prediction: " + str(y)
+    else:
+        # Just train the model using gridSearch but don't print anything if verbose is false.
+        reg.fit(X, y)
 
+    # Return our gridSearch object containing our best model.
+    return reg
+
+
+def fit_predict_many(city_data, n=100, verbose=False):
+    # TODO: Add docstrings
+    # Here, we can use many iterations of random 10-fold validation splits to try to control our model variance when
+    #   choosing a best parameter.
+    best_max_depth_all = []
+    for i in xrange(n):
+        one_pass = fit_predict_model(city_data, verbose=verbose)
+        best_max_depth_all.append(one_pass)
+    return best_max_depth_all
+
+
+def plot_depth_distribution(best_depths):
+    # TODO: Add docstrings
+    best_depths_list = [model.best_params_['max_depth'] for model in best_depths]
+
+    plt.figure(figsize=(12, 9))
+    # Remove unneeded plot frame lines and ticks.
+    ax = plt.subplot(1, 1, 1)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
+
+    plt.xticks(fontsize=14)
+    plt.xlabel('Best Max Depth', fontsize=16)
+    plt.ylabel('Count', fontsize=16)
+
+    plt.hist(best_depths_list, color="#3F5D7D", bins=range(11))
+    plt.title('Best "Max Depth" parameter settings found over {0} different runs of gridSearch'.format(len(best_depths)))
+
+    plt.show()
+
+def plot_prediction_distribution(best_depths):
+    # TODO: Add docstrings
+    from scipy.stats.kde import gaussian_kde
+
+    x = np.array([11.95, 0.00, 18.100, 0, 0.6590, 5.6090, 90.00, 1.385, 24, 680.0, 20.20, 332.09, 12.13]).reshape(1, -1)
+    y_predictions = [model.predict(x)[0] for model in best_depths]
+
+    plt.figure(figsize=(12, 9))
+    # Remove unneeded plot frame lines and ticks.
+    ax = plt.subplot(1, 1, 1)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
+
+    plt.xticks(fontsize=14)
+    plt.xlabel('Predicted Value', fontsize=16)
+    plt.ylabel('Probability', fontsize=16)
+
+    # http://stackoverflow.com/questions/15415455/plotting-probability-density-function-by-sample-with-matplotlib
+    # this create the kernel, given an array it will estimate the probability over that values
+    kde = gaussian_kde(y_predictions)
+    # these are the values over which your kernel will be evaluated
+    dist_space = np.linspace(min(y_predictions), max(y_predictions), 100)
+
+    plt.plot(dist_space, kde(dist_space), color="#3F5D7D")
+    plt.title('Probability Density for Prediction from each Best Max Depth Model over {0} different runs of gridSearch'.format(len(best_depths)))
+
+    plt.show()
 
 def main():
     """Analyze the Boston housing data. Evaluate and validate the
@@ -231,15 +390,22 @@ def main():
     X_train, y_train, X_test, y_test = split_data(city_data)
 
     # Learning Curve Graphs
+
+    # Move logic/flow control out of main() and pass list as argument to our learning_curve function.
     max_depths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    # for max_depth in max_depths:
-    #     learning_curve(max_depth, X_train, y_train, X_test, y_test)
+
+    learning_curve(max_depths, X_train, y_train, X_test, y_test)
 
     # Model Complexity Graph
     model_complexity(X_train, y_train, X_test, y_test)
 
     # Tune and predict Model
     fit_predict_model(city_data)
+
+    # Tune and predict Model over many iterations.
+    many_iter = fit_predict_many(city_data, n=100)
+    plot_depth_distribution(many_iter)
+    plot_prediction_distribution(many_iter)
 
 
 if __name__ == "__main__":
