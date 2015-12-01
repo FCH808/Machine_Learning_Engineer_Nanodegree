@@ -5,7 +5,6 @@ import numpy as np
 import pylab as pl
 import pandas as pd
 import matplotlib.pyplot as plt
-
 from sklearn import datasets
 from sklearn.cross_validation import ShuffleSplit, train_test_split, KFold
 from sklearn.grid_search import GridSearchCV
@@ -149,6 +148,7 @@ def train_decision_tree(sizes, depth, X_test, X_train, y_test, y_train):
 
     return test_err, train_err
 
+
 def learning_curve_graph_pd(df):
     # TODO: Add docstrings
     # key = each Depth value
@@ -157,9 +157,9 @@ def learning_curve_graph_pd(df):
 
     for i, key_group_pair in enumerate(df.groupby(['Depth'])):
         key, grp = key_group_pair
-        each_ax = fig.add_subplot(5, 2, i+1)
+        each_ax = fig.add_subplot(5, 2, i + 1)
         each_ax.set_ylim([0, 80])
-        each_ax.set_title('Depth: {}'.format(i+1))
+        each_ax.set_title('Depth: {}'.format(i + 1))
         each_ax.plot(grp['Size'], grp['Test Error'])
         each_ax.plot(grp['Size'], grp['Training Error'])
 
@@ -167,6 +167,7 @@ def learning_curve_graph_pd(df):
     plt.legend(loc='best')
     plt.xlabel('Training set size', fontsize=20, horizontalalignment='right')
     plt.show()
+
 
 def learning_curve_graph(sizes, train_err, test_err, show=True):
     """Plot training and test error as a function of the training size."""
@@ -277,8 +278,8 @@ def fit_predict_model(city_data, verbose=True):
     #   10-fold cross validation.
 
     kfold_split = KFold(np.shape(X)[0],
-                                 n_folds=10,
-                                 random_state=None)
+                        n_folds=10,
+                        random_state=None)
 
     reg = GridSearchCV(estimator=regressor,
                        param_grid=parameters,
@@ -301,7 +302,8 @@ def fit_predict_model(city_data, verbose=True):
         # Use the model to predict the output of a particular sample
         # Changed to address changes in sklearn:
         # DeprecationWarning: Passing 1d arrays as data is deprecated in 0.17 and willraise ValueError in 0.19.
-        x = np.array([11.95, 0.00, 18.100, 0, 0.6590, 5.6090, 90.00, 1.385, 24, 680.0, 20.20, 332.09, 12.13]).reshape(1, -1)
+        x = np.array([11.95, 0.00, 18.100, 0, 0.6590, 5.6090, 90.00, 1.385, 24, 680.0, 20.20, 332.09, 12.13]).reshape(1,
+                                                                                                                      -1)
         y = reg.predict(x)
         print "House: " + str(x)
         print "Prediction: " + str(y)
@@ -324,7 +326,95 @@ def fit_predict_many(city_data, n=100, verbose=False):
     return best_max_depth_all
 
 
-def plot_depth_distribution(best_depths):
+def get_xval_data_from_GridScore(oneGridScoreObject):
+    # TODO: add docstrings
+
+    best_depth = oneGridScoreObject.best_params_['max_depth']
+    best_depth_kfold_scores = oneGridScoreObject.grid_scores_[best_depth - 1].cv_validation_scores
+
+    # TODO: Remove if calculating summary stats in the end instead
+    # best_loss = oneGridScoreObject.best_score_
+    # best_std = np.std(oneGridScoreObject.grid_scores_[best_depth - 1].cv_validation_scores)
+
+    return best_depth, best_depth_kfold_scores
+
+
+def get_xval_data_from_list_Gridscores(manyGridScoreObjects):
+    # TODO: add docstrings
+
+    best_max_depths_all = {}
+
+    for eachGridScoreObject in manyGridScoreObjects:
+
+        # Pull out the loss for each fold in each best 'max depth' of each run.
+        best_depth, best_depth_kfold_scores = get_xval_data_from_GridScore(eachGridScoreObject)
+
+        try:
+            best_max_depths_all[best_depth] = np.append(best_max_depths_all[best_depth], best_depth_kfold_scores)
+        except KeyError:
+            best_max_depths_all[best_depth] = best_depth_kfold_scores
+
+    # TODO: remove if aggregating all and getting summary stats on original kfold datapoints
+    # http://stats.stackexchange.com/questions/25848/how-to-sum-a-standard-deviation
+    # http://en.wikipedia.org/wiki/Sum_of_normally_distributed_random_variables
+    # http://mathworld.wolfram.com/NormalSumDistribution.html
+    # Here we can 1. average the means for each best value of 'max depth', and
+    #             2. sum the variances, then take the square root of the summed variances
+    #                to get the average standard deviation of the standard deviations.
+
+    # max_depths_all['avg_loss_']
+
+    return best_max_depths_all
+
+
+def create_df_from_mismatch_dict(best_max_depths_all):
+
+    max_depths_all = []
+    scores_all = []
+
+    for key, value in best_max_depths_all.iteritems():
+        max_depths = [key] * len(value)
+        scores = list(value)
+
+        max_depths_all += max_depths
+        scores_all += scores
+
+    return pd.DataFrame({'Max Depth': max_depths_all, 'Loss': scores_all})
+
+
+def plot_all_distributions(best_depths):
+    # TODO: Add docstrings
+
+    best_max_depths_all = get_xval_data_from_list_Gridscores(best_depths)
+
+    best_max_depths_df = create_df_from_mismatch_dict(best_max_depths_all)
+
+    best_max_depths_stats = best_max_depths_df.groupby(['Max Depth'], as_index=False)\
+        .aggregate([np.mean, np.std])\
+        .reset_index()
+
+
+    # TODO: fix this plot
+
+    plt.xlim([0, 11])
+    plt.gca().invert_yaxis()
+
+    plt.scatter(best_max_depths_df['Max Depth'],
+                best_max_depths_df['Loss'], alpha=0.25)
+
+    plt.scatter(best_max_depths_stats['Max Depth'],
+                best_max_depths_stats['Loss']['mean'],
+                color='red',
+                s=20, marker='x')
+
+    plt.errorbar(best_max_depths_stats['Max Depth'],
+                 best_max_depths_stats['Loss']['mean'],
+                 yerr=best_max_depths_stats['Loss']['std'])
+
+    plt.show()
+
+
+def plot_hist_best_max_depths(best_depths):
     # TODO: Add docstrings
     best_depths_list = [model.best_params_['max_depth'] for model in best_depths]
 
@@ -341,9 +431,11 @@ def plot_depth_distribution(best_depths):
     plt.ylabel('Count', fontsize=16)
 
     plt.hist(best_depths_list, color="#3F5D7D", bins=range(11))
-    plt.title('Best "Max Depth" parameter settings found over {0} different runs of gridSearch'.format(len(best_depths)))
+    plt.title(
+        'Best "Max Depth" parameter settings found over {0} different runs of gridSearch'.format(len(best_depths)))
 
     plt.show()
+
 
 def plot_prediction_distribution(best_depths):
     # TODO: Add docstrings
@@ -371,9 +463,12 @@ def plot_prediction_distribution(best_depths):
     dist_space = np.linspace(min(y_predictions), max(y_predictions), 100)
 
     plt.plot(dist_space, kde(dist_space), color="#3F5D7D")
-    plt.title('Probability Density for Prediction from each Best Max Depth Model over {0} different runs of gridSearch'.format(len(best_depths)))
+    plt.title(
+        'Probability Density for Prediction from each Best Max Depth Model over {0} different runs of gridSearch'.format(
+            len(best_depths)))
 
     plt.show()
+
 
 def main():
     """Analyze the Boston housing data. Evaluate and validate the
@@ -394,18 +489,20 @@ def main():
     # Move logic/flow control out of main() and pass list as argument to our learning_curve function.
     max_depths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-    learning_curve(max_depths, X_train, y_train, X_test, y_test)
+    # learning_curve(max_depths, X_train, y_train, X_test, y_test)
 
     # Model Complexity Graph
-    model_complexity(X_train, y_train, X_test, y_test)
+    # model_complexity(X_train, y_train, X_test, y_test)
 
     # Tune and predict Model
     fit_predict_model(city_data)
 
     # Tune and predict Model over many iterations.
-    many_iter = fit_predict_many(city_data, n=100)
-    plot_depth_distribution(many_iter)
-    plot_prediction_distribution(many_iter)
+    many_iter = fit_predict_many(city_data, n=20)
+    # plot_hist_best_max_depths(many_iter)
+    # plot_prediction_distribution(many_iter)
+
+    plot_all_distributions(many_iter)
 
 
 if __name__ == "__main__":
