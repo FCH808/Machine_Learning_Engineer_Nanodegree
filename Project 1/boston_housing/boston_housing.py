@@ -12,6 +12,7 @@ from sklearn.metrics import make_scorer
 from sklearn.metrics import mean_squared_error
 from sklearn.tree import DecisionTreeRegressor
 
+plt.style.use('bmh')
 
 ################################
 ### ADD EXTRA LIBRARIES HERE ###
@@ -40,18 +41,31 @@ def explore_city_data(city_data):
 
     # Size of data (number of houses)?
     n_rows = np.shape(city_data.data)[0]
+    print 'Number of houses in data set: {}'.format(n_rows)
+
     # Number of features?
-    n_features = np.shape(city_data.data)[0]
+    n_features = np.shape(city_data.data)[1]
+    print 'Number of features: {}'.format(n_features)
+
     # Minimum price?
     price_min = np.min(city_data.target)
+    print 'Minimum house price in dataset: {0}'.format(price_min)
+
     # Maximum price?
     price_max = np.max(city_data.target)
+    print 'Maximum house price in dataset: {0}'.format(price_max)
+
     # Calculate mean price?
     price_mean = np.mean(city_data.target)
+    print 'Average house price: {0}'.format(price_mean)
+
     # Calculate median price?
     price_median = np.median(city_data.target)
+    print 'Median house price: {0}'.format(price_median)
+
     # Calculate standard deviation?
     price_std = np.std(city_data.target)
+    print 'House price standard deviation: {0}'.format(price_std)
 
 
 def performance_metric(label, prediction):
@@ -154,6 +168,7 @@ def learning_curve_graph_pd(df):
     # key = each Depth value
     # grp is each sub-dataframe filtered by the Depth value of 'key'
     fig = plt.figure(figsize=(16, 18))
+    ax = fig.add_subplot(1,1,1)
 
     for i, key_group_pair in enumerate(df.groupby(['Depth'])):
         key, grp = key_group_pair
@@ -165,7 +180,18 @@ def learning_curve_graph_pd(df):
 
     plt.suptitle('Train & Test set error as a function of training set size', fontsize=20)
     plt.legend(loc='best')
-    plt.xlabel('Training set size', fontsize=20, horizontalalignment='right')
+
+    print plt.style.available
+
+    # Turn off axis lines and ticks of the big subplot
+    ax.spines['top'].set_color('none')
+    ax.spines['bottom'].set_color('none')
+    ax.spines['left'].set_color('none')
+    ax.spines['right'].set_color('none')
+    ax.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
+    ax.set_ylabel('Mean Squared Error',fontsize=20)
+    ax.set_xlabel('Training set size', fontsize=20, horizontalalignment='center')
+
     plt.show()
 
 
@@ -302,8 +328,8 @@ def fit_predict_model(city_data, verbose=True):
         # Use the model to predict the output of a particular sample
         # Changed to address changes in sklearn:
         # DeprecationWarning: Passing 1d arrays as data is deprecated in 0.17 and willraise ValueError in 0.19.
-        x = np.array([11.95, 0.00, 18.100, 0, 0.6590, 5.6090, 90.00, 1.385, 24, 680.0, 20.20, 332.09, 12.13]).reshape(1,
-                                                                                                                      -1)
+        x = np.array([11.95, 0.00, 18.100, 0, 0.6590, 5.6090, 90.00, 1.385, 24,
+                      680.0, 20.20, 332.09, 12.13]).reshape(1, -1)
         y = reg.predict(x)
         print "House: " + str(x)
         print "Prediction: " + str(y)
@@ -330,6 +356,7 @@ def get_xval_data_from_GridScore(oneGridScoreObject):
     # TODO: add docstrings
 
     best_depth = oneGridScoreObject.best_params_['max_depth']
+    # Array indexing starts at 0, so the index is [max_depth - 1]
     best_depth_kfold_scores = oneGridScoreObject.grid_scores_[best_depth - 1].cv_validation_scores
 
     # TODO: Remove if calculating summary stats in the end instead
@@ -393,23 +420,36 @@ def plot_all_distributions(best_depths):
         .aggregate([np.mean, np.std])\
         .reset_index()
 
+    # Add a bit of jitter to the max depth for each fold to avoid overplotting
+    best_max_depths_df['Jitter Max Depth'] = best_max_depths_df['Max Depth']\
+        .apply(lambda x: x*(1+np.random.uniform(-0.02, 0.02)))
 
     # TODO: fix this plot
 
     plt.xlim([0, 11])
+    plt.xticks(range(0, 11))
+
     plt.gca().invert_yaxis()
 
-    plt.scatter(best_max_depths_df['Max Depth'],
+    plt.scatter(best_max_depths_df['Jitter Max Depth'],
                 best_max_depths_df['Loss'], alpha=0.25)
 
     plt.scatter(best_max_depths_stats['Max Depth'],
                 best_max_depths_stats['Loss']['mean'],
                 color='red',
-                s=20, marker='x')
+                s=50, marker='o')
 
     plt.errorbar(best_max_depths_stats['Max Depth'],
                  best_max_depths_stats['Loss']['mean'],
                  yerr=best_max_depths_stats['Loss']['std'])
+
+    # TODO: add dynamic #'s to title.
+
+    plt.title('Mean Squared Error for the best "max depth" of each run \n'
+              ' in each fold of (#) iterations of (#)-fold cross-validation.')
+
+    plt.xlabel('Best Max Depth')
+    plt.ylabel('Mean Squared Error')
 
     plt.show()
 
@@ -443,6 +483,7 @@ def plot_prediction_distribution(best_depths):
 
     x = np.array([11.95, 0.00, 18.100, 0, 0.6590, 5.6090, 90.00, 1.385, 24, 680.0, 20.20, 332.09, 12.13]).reshape(1, -1)
     y_predictions = [model.predict(x)[0] for model in best_depths]
+    y_predictions_mean = np.mean(y_predictions)
 
     plt.figure(figsize=(12, 9))
     # Remove unneeded plot frame lines and ticks.
@@ -452,20 +493,33 @@ def plot_prediction_distribution(best_depths):
     ax.get_xaxis().tick_bottom()
     ax.get_yaxis().tick_left()
 
-    plt.xticks(fontsize=14)
-    plt.xlabel('Predicted Value', fontsize=16)
-    plt.ylabel('Probability', fontsize=16)
 
     # http://stackoverflow.com/questions/15415455/plotting-probability-density-function-by-sample-with-matplotlib
-    # this create the kernel, given an array it will estimate the probability over that values
+    # https://en.wikipedia.org/wiki/Kernel_density_estimation
+    # In statistics, kernel density estimation (KDE) is a non-parametric way to estimate the probability density function of a random variable.
+
     kde = gaussian_kde(y_predictions)
     # these are the values over which your kernel will be evaluated
-    dist_space = np.linspace(min(y_predictions), max(y_predictions), 100)
+    # Add 2 to min/max to extend the curve
+    dist_space = np.linspace(min(y_predictions)-2, max(y_predictions)+2, 100)
+    y = kde(dist_space)
 
-    plt.plot(dist_space, kde(dist_space), color="#3F5D7D")
+    plt.plot(dist_space, y, color="#348ABD")
+    plt.fill_between(dist_space, 0, y, color='#348ABD', alpha=0.4)
+    plt.vlines(y_predictions_mean,
+               ymin=0, ymax=1,
+               colors='k',
+               linestyles="--",
+               lw=2,
+               label='Avg. Predicted Price: {:,}'.format(int(round(y_predictions_mean, 3)*1000)))
+
+    plt.legend()
     plt.title(
-        'Probability Density for Prediction from each Best Max Depth Model over {0} different runs of gridSearch'.format(
-            len(best_depths)))
+        'Estimated Probability Density for Prediction of each Best Max Depth Model \n'
+        ' over {0} different runs of gridSearch'.format(len(best_depths)))
+    plt.xlabel('Predicted Value', fontsize=16)
+    plt.ylabel('Probability', fontsize=16)
+    plt.xticks(fontsize=14)
 
     plt.show()
 
@@ -489,18 +543,18 @@ def main():
     # Move logic/flow control out of main() and pass list as argument to our learning_curve function.
     max_depths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-    # learning_curve(max_depths, X_train, y_train, X_test, y_test)
+    learning_curve(max_depths, X_train, y_train, X_test, y_test)
 
     # Model Complexity Graph
-    # model_complexity(X_train, y_train, X_test, y_test)
+    model_complexity(X_train, y_train, X_test, y_test)
 
     # Tune and predict Model
     fit_predict_model(city_data)
 
     # Tune and predict Model over many iterations.
-    many_iter = fit_predict_many(city_data, n=20)
+    many_iter = fit_predict_many(city_data, n=10)
     # plot_hist_best_max_depths(many_iter)
-    # plot_prediction_distribution(many_iter)
+    plot_prediction_distribution(many_iter)
 
     plot_all_distributions(many_iter)
 
