@@ -76,7 +76,7 @@ def performance_metric(label, prediction):
     ###################################
 
     # http://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
-    return mean_squared_error(label, prediction)
+    return mean_squared_error(label, prediction)**0.5
 
 
 def split_data(city_data):
@@ -173,7 +173,7 @@ def learning_curve_graph_pd(df):
     for i, key_group_pair in enumerate(df.groupby(['Depth'])):
         key, grp = key_group_pair
         each_ax = fig.add_subplot(5, 2, i + 1)
-        each_ax.set_ylim([0, 80])
+        #each_ax.set_ylim([0, 80])
         each_ax.set_title('Depth: {}'.format(i + 1))
         each_ax.plot(grp['Size'], grp['Test Error'])
         each_ax.plot(grp['Size'], grp['Training Error'])
@@ -512,6 +512,7 @@ def plot_prediction_distribution(best_depths):
                linestyles="--",
                lw=2,
                label='Avg. Predicted Price: {:,}'.format(int(round(y_predictions_mean, 3)*1000)))
+
 
     plt.legend()
     plt.title(

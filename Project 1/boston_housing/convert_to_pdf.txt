@@ -1,0 +1,3 @@
+# Run the following in terminal with hidecode.tplx in the same directory.
+
+ipython nbconvert --to pdf --template hidecode boston_housing.ipynb
