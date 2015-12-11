@@ -1,3 +1,3 @@
-# Run the following in terminal with hidecode.tplx in the same directory.
+# Run the following in terminal with hidecode.tplx in the same directory to convert ipynb to a pdf report.
 
-ipython nbconvert --to pdf --template hidecode boston_housing.ipynb
+ipython nbconvert --to pdf --template hidecode "Boston Housing.ipynb"
