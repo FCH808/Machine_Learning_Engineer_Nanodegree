@@ -747,7 +747,7 @@ def main():
     fit_predict_model(city_data)
 
     # Tune and predict Model over many iterations.
-    many_iter = fit_predict_many(city_data, n=10)
+    many_iter = fit_predict_many(city_data, n=100)
 
     # Plot best max depth over many runs
     plot_hist_best_max_depths(many_iter)
