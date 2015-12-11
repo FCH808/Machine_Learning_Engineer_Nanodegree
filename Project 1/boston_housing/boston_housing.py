@@ -710,7 +710,7 @@ def plot_price(city_data):
     bins = range(5, 51, 1)
     plt.hist(city_data.target, bins, color="#3F5D7D")
     plt.xticks(range(5, 51, 2))
-    plt.title('Histogram of Full Dataset Prices')
+    plt.title('Histogram of Prices from Full Dataset')
     plt.xlabel('Price (in $1000 bins)')
     plt.ylabel('Frequency')
     plt.show()
