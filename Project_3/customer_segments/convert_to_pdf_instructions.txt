@@ -1,3 +1,3 @@
 # Run the following in terminal with hidecode.tplx in the same directory to convert ipynb to a pdf report.
 
-ipython nbconvert --to pdf --template hidecode "customer_segments.ipynb"
+ipython nbconvert --to pdf --template hidecode "Customer_Segments.ipynb"
