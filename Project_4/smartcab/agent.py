@@ -38,6 +38,7 @@ class LearningAgent(Agent):
 
         # Update state, defined below
         state = self.getState()
+        self.state = state
 
 
         # Select action according to policy
@@ -134,7 +135,7 @@ class LearningAgent(Agent):
 
     def computeValueFromQValues(self, state, exploration_bonus=False):
         ''' Returns the max value of the Q-values of the valid actions in a
-        particular state.
+        particular state that is passed in.
 
 
         Args:
@@ -221,7 +222,7 @@ def run():
     e.set_primary_agent(a, enforce_deadline=True)  # set agent to track
 
     # Now simulate it
-    sim = Simulator(e, update_delay=0.001)  # reduce update_delay to speed up simulation
+    sim = Simulator(e, update_delay=2)  # reduce update_delay to speed up simulation
     sim.run(n_trials=100)  # press Esc or close pygame window to quit
 
     #with open('goals_reached.csv', 'w') as f:
