@@ -79,10 +79,10 @@ class LearningAgent(Agent):
         self.total_reward += reward
 
         if reward < 0:
-            print ""
+            print "*"*80
             print "NEGATIVE!"
             print reward
-            print ""
+            print "*"*80
 
         if reward >= 10:
             # Print out current trial record each time destination is reached.
@@ -124,12 +124,16 @@ class LearningAgent(Agent):
         return state
 
     def getQValue(self, state, action):
+        """ Returns QValue of state/action pair that are passed in.
+
+        Args:
+            state (tuple): Tuple of tuples representing a particular state of
+             the system.
+
+          Returns:
+               Q-node value (int): Default value if we have never seen a state
+                or the Q node value otherwise
         """
-          Returns Q(state,action)
-          Should return a default value if we have never seen a state
-          or the Q node value otherwise
-        """
-        "*** YOUR CODE HERE ***"
 
         return self.Q_vals[(state, action)]
 
@@ -139,13 +143,14 @@ class LearningAgent(Agent):
 
 
         Args:
-            state (tuple): Tuple of tuples describing the current state
-                of the system.
+            state (tuple): Tuple of tuples representing a particular state of
+             the system.
             exploration_bonus (Boolean): Whether to use an exploration bonus to
              encourage unexplored actions.
 
         Returns:
-            max_Q (float): Max Q-value of valid actions in current state.
+            max_Q (float): Max Q-value of valid actions from the state that
+             is being evaluated.
 
         '''
         max_Q = float('-inf')
@@ -161,7 +166,6 @@ class LearningAgent(Agent):
                 state_action_visits = 1 if state_action_visits == 0 else state_action_visits
 
                 current_Q += float(0.01)/state_action_visits
-                # print 'Current: ', current_Q, ' | max: ', max_Q
 
             if current_Q > max_Q:
                 max_Q = current_Q
@@ -175,14 +179,15 @@ class LearningAgent(Agent):
         Can also add a random action choice chance with the 'stochastic' flag.
 
         Args:
-            state (tuple): Tuple of tuples describing the current state
-                of the system.
+            state (tuple): Tuple of tuples representing a particular state of
+             the system.
             stochastic (Boolean): Whether to add a small chance (self.epsilon)
              to take a random action instead of the optimal action from the
              stored actions' Q-values for the state passed in.
 
         Returns:
-            best_action (string): A valid action to take from the current state.
+            best_action (string): A valid action to take from the state that
+             is being evaluated.
 
         '''
         best_action = ""
@@ -194,6 +199,13 @@ class LearningAgent(Agent):
         all_actions = self.env.valid_actions
         random.shuffle(all_actions)
 
+        # Add random choice of actions with probability epsilon
+        if stochastic == True:
+            r = random.random()
+            if r < self.epsilon:
+                best_action = random.choice(all_actions)
+                return best_action # No need to eval rest if randomly chosen
+
         for action in all_actions:
             current_Q = self.getQValue(state, action)
             if current_Q > max_Q:
@@ -204,11 +216,6 @@ class LearningAgent(Agent):
             #  which is greater than -inf
             best_action = random.choice(all_actions)
 
-        # Add random choice of actions with probability epsilon
-        if stochastic == True:
-            r = random.random()
-            if r < self.epsilon:
-                best_action = random.choice(all_actions)
         return best_action
 
 
