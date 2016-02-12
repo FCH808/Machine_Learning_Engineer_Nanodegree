@@ -20,7 +20,7 @@ class LearningAgent(Agent):
         self.alpha = 0.1 # Learning rate
         self.discount = 0.9 # Future discount factor
         self.total_reward = 0.0 # Cumulative reward
-        self.diagnostics = {}
+        self.diagnostics = defaultdict(lambda: 0)
         self.n_trials = 0 # Counter for n_trials
         self.epsilon = 0.05 # Random action chance
 
@@ -98,37 +98,28 @@ class LearningAgent(Agent):
         self.total_reward += reward
 
         if reward < 0:
-            print "*"*80
-            print "NEGATIVE!"
-            print reward
-            print "*"*80
+            self.diagnostics['mistakes'] += reward
+
 
         if reward >= 10:
             # Print out current trial record each time destination is reached.
             # This is presumably when the target has been reached.
             self.diagnostics[self.n_trials] = 'yay'
 
-        if self.n_trials == 100:
-            # Print out statistics up to the last trial
-            print self.Q_vals
-            print "*"*80
-            print self.diagnostics
-            print "*"*80
-            print 'Total Cumulative Rewards {}'.format(self.total_reward)
-            #print self.state_visits
-            print 'Total State/Action visits: ', sum(self.state_action_visits.values())
-            print 'Total State Visits: ', sum(self.state_visits.values())
-
-            print 't:', t, "!!!!"
 
     def experience_replay_updates(self, planning_states):
-        """ Takes a collection of <s, a, s' r> tuples of the agent's experiences
+        """ Takes a collection of <s, a, s' r> tuples of the agent's past
+         experiences and updates the Q(s,a) values by 'replaying past
+         experiences' using the most recent stored past experience of
+          <s,a,s',r>.
 
 
         Args:
-            planning_states (tuple):
+            planning_states (list): List of tuples containing ((state, action),
+                                                               (next_state, reward))
 
         Returns:
+            None: Updates self.Q_vals in-place.
 
         """
 
@@ -273,22 +264,62 @@ class LearningAgent(Agent):
 def run():
     """Run the agent for a finite number of trials."""
 
-    # Set up environment and agent
-    e = Environment()  # create environment (also adds some dummy traffic)
-    a = e.create_agent(LearningAgent, Q_val_starting_val=0, replay_memory_episodes=20)  # create agent
-    e.set_primary_agent(a, enforce_deadline=True)  # set agent to track
+    # # Set up environment and agent
+    # e = Environment()  # create environment (also adds some dummy traffic)
+    # a = e.create_agent(LearningAgent, Q_val_starting_val=10, replay_memory_episodes=5)  # create agent
+    # e.set_primary_agent(a, enforce_deadline=True)  # set agent to track
+    #
+    # # Now simulate it
+    # sim = Simulator(e, update_delay=.002)  # reduce update_delay to speed up simulation
+    # sim.run(n_trials=100)  # press Esc or close pygame window to quit
+    #
+    #
+    # print 'Total Reward: ', e.primary_agent.total_reward
+    # print 'Q-value updates: ', sum(e.primary_agent.state_action_visits.values())
+    # print 'Negative score from mistakes:', e.primary_agent.diagnostics['mistakes']
+    # print 'Goal reached {} times'.format(e.primary_agent.diagnostics.values().count('yay'))
 
-    # Now simulate it
-    sim = Simulator(e, update_delay=.002)  # reduce update_delay to speed up simulation
-    sim.run(n_trials=100)  # press Esc or close pygame window to quit
+
+    Q_val_starting_val = 10
+    replay_memory_episodes = 5
+    n_trials = 100
+    mtry = 1
+
+    with open('summary_info.csv', 'w') as f:
+        f.write('{0},{1},{2},{3},{4},{5},{6},{7}\n'.format('Q_val_starting_val', 'replay_mem_ep',
+                                                           'total_reward', 'total_updates',
+                                                           'neg_score', 'n_goal_reached',
+                                                           'n_trials', 'mtry'))
+
+        for Q_val_starting_val in [0, 1, 5, 10, 20]:
+
+            for replay_memory_episodes in [0, 1, 5, 10, 20, 50]:
+
+                for mtry in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]:
+
+                    e = Environment()
+                    a = e.create_agent(LearningAgent,
+                                       Q_val_starting_val=Q_val_starting_val,
+                                       replay_memory_episodes=replay_memory_episodes)
+                    e.set_primary_agent(a, enforce_deadline=True)
+
+                    # Now simulate it
+                    sim = Simulator(e, update_delay=.002)
+                    sim.run(n_trials=n_trials)
 
 
-    print e.primary_agent.total_reward
+                    Q_val_starting_val = Q_val_starting_val
+                    replay_mem_ep = replay_memory_episodes
+                    total_reward = e.primary_agent.total_reward
+                    total_updates = sum(e.primary_agent.state_action_visits.values())
+                    neg_score = e.primary_agent.diagnostics['mistakes']
+                    n_goal_reached = e.primary_agent.diagnostics.values().count('yay')
 
-    print 'Goal reached {} times'.format(sum(sim.goals_reached.values()))
-    #with open('goals_reached.csv', 'w') as f:
-    #    f.write('{0},{1}\n'.format('Trial', 'Goal_Reached'))
-    #    [f.write('{0},{1}\n'.format(key, value)) for key, value in sim.goals_reached.items()]
+                    f.write('{0},{1},{2},{3},{4},{5},{6},{7}\n'.format(Q_val_starting_val, replay_mem_ep,
+                                                                       total_reward, total_updates,
+                                                                       neg_score, n_goal_reached,
+                                                                       n_trials, mtry))
+
 
 if __name__ == '__main__':
     run()
