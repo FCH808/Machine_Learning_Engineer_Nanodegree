@@ -72,21 +72,19 @@ class LearningAgent(Agent):
 
             # ~ Q-VALUE UPDATE ~
             # Update Q(s, a) with a discounted future max(Q(s') values)
-            # Add an exploration bonus to unvisited Q-values, computeValueFromQValues(.., exploration_bonus=True)
-            # Note: Unneeded in our formulation since we started with
-            #  optimistic Q values to encourage exploration.
             new_Q_sa = self.update_Q_sa(self.state, action, reward, next_state)
 
             # Update our Q-value table
             self.Q_vals[(self.state, action)] = new_Q_sa
 
 
-            # Do some Dyna-Q/experience replay learning!
+            # Do some Dyna-Q/experience_replay learning!
             try:
                 # Try/except works here b/c it will only fail briefly until at
-                #  least 'self.planning_steps' many state actions pairs are visited
+                #  least 'self.planning_steps' many state actions pairs are
+                #  visited and stored
 
-                # Sample K different random state/actions;
+                # Sample N different random state/actions;
                 memory_states = random.sample(self.replay_memory.items(), self.replay_memory_episodes)
                 self.experience_replay_updates(memory_states)
 
@@ -102,8 +100,7 @@ class LearningAgent(Agent):
 
 
         if reward >= 10:
-            # Print out current trial record each time destination is reached.
-            # This is presumably when the target has been reached.
+            # Update statistics when goal reached
             self.diagnostics[self.n_trials] = 'yay'
 
 
@@ -148,8 +145,6 @@ class LearningAgent(Agent):
         # Get current Q(s,a) value
         current_Q_sa = self.getQValue(state, action)
 
-        #new_Q_sa = (1 - self.alpha) * current_Q_sa + self.alpha * (reward + self.discount * self.computeMaxQ_value(next_state, exploration_bonus=False))
-        # Algebraic manipulation: rewritten more compactly.
         new_Q_sa = current_Q_sa + self.alpha * (reward + self.discount * self.computeMaxQ_value(next_state) - current_Q_sa)
         return new_Q_sa
 
@@ -183,15 +178,13 @@ class LearningAgent(Agent):
 
         return self.Q_vals[(state, action)]
 
-    def computeMaxQ_value(self, state, exploration_bonus=False):
+    def computeMaxQ_value(self, state):
         ''' Returns the max Q-value over all valid actions that can be taken
         from the state that is passed in.
 
         Args:
             state (tuple): Tuple of tuples representing a particular state of
              the system.
-            exploration_bonus (Boolean): Whether to use an exploration bonus to
-             encourage unexplored actions.
 
         Returns:
             max_Q (float): Max Q-value of valid actions from the state that
@@ -204,13 +197,6 @@ class LearningAgent(Agent):
 
         for action in all_actions:
             current_Q = self.getQValue(state, action)
-
-            # Artificially inflate Q-values if they have not been visited many times
-            if exploration_bonus:
-                state_action_visits = self.state_visits[(state, action)]
-                state_action_visits = 1 if state_action_visits == 0 else state_action_visits
-
-                current_Q + 0.01/state_action_visits
 
             if current_Q > max_Q:
                 max_Q = current_Q
@@ -237,7 +223,7 @@ class LearningAgent(Agent):
         '''
         best_action = ""
         max_Q = float('-inf')
-        # Shuffle actions randomly in case no Qvalue is above the
+        # Shuffle actions randomly in case no Q-value is above the
         #  default returned value when nothing is found in our Q-values default
         #  dict. This effectively makes it a random choice if we haven't
         #  encountered any of these state/action pairs yet.
@@ -264,61 +250,60 @@ class LearningAgent(Agent):
 def run():
     """Run the agent for a finite number of trials."""
 
-    # # Set up environment and agent
-    # e = Environment()  # create environment (also adds some dummy traffic)
-    # a = e.create_agent(LearningAgent, Q_val_starting_val=10, replay_memory_episodes=5)  # create agent
-    # e.set_primary_agent(a, enforce_deadline=True)  # set agent to track
+    # Set up environment and agent
+    e = Environment()  # create environment (also adds some dummy traffic)
+    a = e.create_agent(LearningAgent, Q_val_starting_val=10, replay_memory_episodes=5)  # create agent
+    e.set_primary_agent(a, enforce_deadline=True)  # set agent to track
+
+    # Now simulate it
+    sim = Simulator(e, update_delay=.002)  # reduce update_delay to speed up simulation
+    sim.run(n_trials=100)  # press Esc or close pygame window to quit
+
+
+    print 'Total Reward: ', e.primary_agent.total_reward
+    print 'Q-value updates: ', sum(e.primary_agent.state_action_visits.values())
+    print 'Negative score from mistakes:', e.primary_agent.diagnostics['mistakes']
+    print 'Goal reached {} times'.format(e.primary_agent.diagnostics.values().count('yay'))
+
+    ############################################################################
+    #####  Run/save summary statistics using various parameter settings.   #####
+    ############################################################################
+    # n_trials = 100
     #
-    # # Now simulate it
-    # sim = Simulator(e, update_delay=.002)  # reduce update_delay to speed up simulation
-    # sim.run(n_trials=100)  # press Esc or close pygame window to quit
+    # with open('summary_info.csv', 'w') as f:
+    #     f.write('{0},{1},{2},{3},{4},{5},{6},{7}\n'.format('Q_val_starting_val', 'replay_mem_ep',
+    #                                                        'total_reward', 'total_updates',
+    #                                                        'neg_score', 'n_goal_reached',
+    #                                                        'n_trials', 'mtry'))
+    #
+    #     for Q_val_starting_val in [0, 1, 5, 10, 20]:
+    #
+    #         for replay_memory_episodes in [0, 1, 5, 10, 20, 50]:
+    #
+    #             for mtry in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]:
+    #
+    #                 e = Environment()
+    #                 a = e.create_agent(LearningAgent,
+    #                                    Q_val_starting_val=Q_val_starting_val,
+    #                                    replay_memory_episodes=replay_memory_episodes)
+    #                 e.set_primary_agent(a, enforce_deadline=True)
+    #
+    #                 # Now simulate it
+    #                 sim = Simulator(e, update_delay=.002)
+    #                 sim.run(n_trials=n_trials)
     #
     #
-    # print 'Total Reward: ', e.primary_agent.total_reward
-    # print 'Q-value updates: ', sum(e.primary_agent.state_action_visits.values())
-    # print 'Negative score from mistakes:', e.primary_agent.diagnostics['mistakes']
-    # print 'Goal reached {} times'.format(e.primary_agent.diagnostics.values().count('yay'))
-
-
-    Q_val_starting_val = 10
-    replay_memory_episodes = 5
-    n_trials = 100
-    mtry = 1
-
-    with open('summary_info.csv', 'w') as f:
-        f.write('{0},{1},{2},{3},{4},{5},{6},{7}\n'.format('Q_val_starting_val', 'replay_mem_ep',
-                                                           'total_reward', 'total_updates',
-                                                           'neg_score', 'n_goal_reached',
-                                                           'n_trials', 'mtry'))
-
-        for Q_val_starting_val in [0, 1, 5, 10, 20]:
-
-            for replay_memory_episodes in [0, 1, 5, 10, 20, 50]:
-
-                for mtry in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]:
-
-                    e = Environment()
-                    a = e.create_agent(LearningAgent,
-                                       Q_val_starting_val=Q_val_starting_val,
-                                       replay_memory_episodes=replay_memory_episodes)
-                    e.set_primary_agent(a, enforce_deadline=True)
-
-                    # Now simulate it
-                    sim = Simulator(e, update_delay=.002)
-                    sim.run(n_trials=n_trials)
-
-
-                    Q_val_starting_val = Q_val_starting_val
-                    replay_mem_ep = replay_memory_episodes
-                    total_reward = e.primary_agent.total_reward
-                    total_updates = sum(e.primary_agent.state_action_visits.values())
-                    neg_score = e.primary_agent.diagnostics['mistakes']
-                    n_goal_reached = e.primary_agent.diagnostics.values().count('yay')
-
-                    f.write('{0},{1},{2},{3},{4},{5},{6},{7}\n'.format(Q_val_starting_val, replay_mem_ep,
-                                                                       total_reward, total_updates,
-                                                                       neg_score, n_goal_reached,
-                                                                       n_trials, mtry))
+    #                 Q_val_starting_val = Q_val_starting_val
+    #                 replay_mem_ep = replay_memory_episodes
+    #                 total_reward = e.primary_agent.total_reward
+    #                 total_updates = sum(e.primary_agent.state_action_visits.values())
+    #                 neg_score = e.primary_agent.diagnostics['mistakes']
+    #                 n_goal_reached = e.primary_agent.diagnostics.values().count('yay')
+    #
+    #                 f.write('{0},{1},{2},{3},{4},{5},{6},{7}\n'.format(Q_val_starting_val, replay_mem_ep,
+    #                                                                    total_reward, total_updates,
+    #                                                                    neg_score, n_goal_reached,
+    #                                                                    n_trials, mtry))
 
 
 if __name__ == '__main__':
