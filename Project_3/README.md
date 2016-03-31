@@ -2,7 +2,11 @@
 
 Unsupervised Learning Project
 
-Must be accessed [here on nbviewer](http://nbviewer.jupyter.org/github/FCH808/Machine_Learning_Engineer_Nanodegree/blob/master/Project_3/customer_segments/Customer_Segments.ipynb) to be rendered online since Github currently cannot render Latex inside of table headers. Downloading to run locally should work as normal.
+[**Must access here on nbviewer**](http://nbviewer.jupyter.org/github/FCH808/Machine_Learning_Engineer_Nanodegree/blob/master/Project_3/customer_segments/Customer_Segments.ipynb) to be rendered online.
+
+Github currently cannot render Latex inside of table headers.
+
+Downloading to run locally should work as normal.
 
 ## Dataset
 
