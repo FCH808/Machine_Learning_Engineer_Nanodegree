@@ -2,11 +2,7 @@
 
 Unsupervised Learning Project
 
-## Template code
-
-In this directory (`customer_segments/`), run `ipython notebook`, open `customer_segments.ipynb` and follow the instructions.
-
-Note: You need Python 2.7, NumPy, pandas, matplotlib and scikit-learn to work on this notebook.
+Must be accessed [here on nbviewer](http://nbviewer.jupyter.org/github/FCH808/Machine_Learning_Engineer_Nanodegree/blob/master/Project_3/customer_segments/Customer_Segments.ipynb) to be rendered online since Github currently cannot render Latex inside of table headers. Downloading to run locally should work as normal.
 
 ## Dataset
 
